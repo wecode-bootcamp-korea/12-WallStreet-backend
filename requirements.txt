@@ -1,0 +1,13 @@
+asgiref==3.2.10
+bcrypt==3.2.0
+certifi==2020.6.20
+cffi==1.14.3
+Django==3.1.2
+django-cors-headers==3.5.0
+django-extensions==3.0.9
+mysqlclient==2.0.1
+pycparser==2.20
+PyJWT==1.7.1
+pytz==2020.1
+six==1.15.0
+sqlparse==0.3.1
