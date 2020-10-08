@@ -1,4 +1,5 @@
-from django.db import models
+from django.db       import models
+from product.models  import Product
 
 class User(models.Model):
     name         = models.CharField(max_length=50)
@@ -44,14 +45,19 @@ class Bank(models.Model):
     class Meta:
         db_table = 'banks'
 
-#class Asset(models.Model):
-    #user = models.ForeignKey(User, on_delete=models.CASCADE)
-    #product 
-    #product_quantity = models.DecimalField(max_digits=10, decimal_places=4)
+class Asset(models.Model):
+    user             = models.ForeignKey(User, on_delete=models.CASCADE)
+    product          = models.ForeignKey(Product, on_delete=models.CASCADE)
+    product_quantity = models.DecimalField(max_digits=10, decimal_places=4)
+    
+    class Meta:
+        db_table = 'assets'
 
+class WishList(models.Model):
+    user    = models.ForeignKey(User, on_delete=models.CASCADE)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE)
 
-#class WishList(models.Model):
-    #user   = models.ForeignKey(User, on_delete=models.CASCADE)
-    #product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    class Meta:
+        db_table = 'wishlists'
 
 
