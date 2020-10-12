@@ -30,9 +30,6 @@ class BankAccount(models.Model):
                                 related_name='virtual_account_bank')
     balance                = models.DecimalField(max_digits=15, decimal_places=2)
 
-    def __str__(self):
-        return self.account_bank
-
     class Meta:
         db_table = 'bank_accounts'
 
