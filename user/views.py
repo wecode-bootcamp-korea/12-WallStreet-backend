@@ -70,3 +70,33 @@ class ActivateView(View):
 
         except KeyError:
             return JsonResponse({'message':'INVALID_KEY'}, status=400)
+
+class SocialSignInView(View):
+    def post(self, request): 
+        try:
+            access_token = request.headers.get('Authorization')
+            kakao_data = requests.get(
+                    "https://kapi.kakao.com/v2/user/me", headers={"Authorization" : f"Bearer {access_token}"},
+                ).json() 
+
+            kakao_name  = kakao_data['kakao_account']['profile']['nickname']
+            kakao_id    = kakao_data['id']
+            kakao_email = kakao_name+str(kakao_id)      
+
+            if not User.objects.filter(email=kakao_email).exists():
+                User.objects.create(
+                    name        = kakao_name,
+                    nickname    = str(uuid.uuid4())[:8],
+                    email       = kakao_name+str(kakao_id),
+                    password    = bcrypt.hashpw(str(uuid.uuid4()).encode('utf-8'), bcrypt.gensalt()).decode('utf-8'),
+                )
+                accessed_user   = User.objects.get(email=kakao_email)
+                access_token    = jwt.encode({'user_id': accessed_user.id}, SECRET_KEY, ALGORITHM)
+                return JsonResponse({'Authorization': access_token.decode('utf-8')}, status=200)        
+            
+            accessed_user   = User.objects.get(email=kakao_email)
+            access_token    = jwt.encode({'user_id': accessed_user.id}, SECRET_KEY, ALGORITHM)
+            return JsonResponse({'Authorization': access_token.decode('utf-8')}, status=200)
+
+        except KeyError:
+            return JsonResponse({'message':'KEY_ERROR'}, status=401)
