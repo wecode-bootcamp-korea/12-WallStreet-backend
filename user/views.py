@@ -1,6 +1,8 @@
 import jwt
 import bcrypt
 import json
+import uuid
+import requests
 
 from django.views                    import View
 from django.http                     import JsonResponse
@@ -10,12 +12,13 @@ from django.utils.http               import urlsafe_base64_encode, urlsafe_base6
 from django.core.mail                import EmailMessage
 from django.utils.encoding           import force_bytes, force_text
 
-from .models            import User
-from my_settings        import EMAIL
-from .utils             import validate_email, validate_password
-from .activation_token  import account_activation_token
-from .text              import email_text
-
+from .models                import User, WishList
+from my_settings            import EMAIL
+from wallstreet.settings    import SECRET_KEY, ALGORITHM
+from .utils                 import validate_email, validate_password
+from .activation_token      import account_activation_token
+from .text                  import email_text
+from utils                  import login_required
 
 class SignUpView(View):
     def post(self, request):
@@ -120,3 +123,18 @@ class SignInView(View):
             
         except KeyError:
             return JsonResponse({'message':'KEY_ERROR'}, status=400)
+            
+class WishListView(View):
+    @login_required
+    def post(self, request, *args, **kwars):
+        data = json.loads(request.body)
+        try:
+            if WishList.objects.filter(user_id=request.user.id, product_id=data['product_id']).exists():
+                WishList.objects.get(user_id=request.user.id, product_id=data['product_id']).delete()
+                return JsonResponse({'message':"SUCCESS"}, status=200)
+
+            WishList.objects.create(user_id=request.user.id, product_id=data['product_id'])
+            return JsonResponse({'message':'SUCCESS'}, status=200)
+
+        except:
+            return JsonResponse({'message':'KEY_ERROR'}, status=401)
