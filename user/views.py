@@ -100,3 +100,23 @@ class SocialSignInView(View):
 
         except KeyError:
             return JsonResponse({'message':'KEY_ERROR'}, status=401)
+
+class SignInView(View):
+    def post(self, request):           
+        data = json.loads(request.body)
+        try:
+            if not User.objects.filter(email=data['email']):
+                return JsonResponse({'message':'INVALID_USER'}, status=401)
+
+            if not bcrypt.checkpw(
+                    data['password'].encode('utf-8'), 
+                    User.objects.get(email = data['email']).password.encode('utf-8')
+                ):                
+                return JsonResponse({'message':'INVALID_USER'}, status=401)
+
+            accessed_user   = User.objects.get(email=data['email'])
+            access_token = jwt.encode({'user_id': accessed_user.id}, SECRET_KEY, ALGORITHM)
+            return JsonResponse({'Authorization': access_token.decode('utf-8')}, status=200)
+            
+        except KeyError:
+            return JsonResponse({'message':'KEY_ERROR'}, status=400)

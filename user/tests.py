@@ -138,3 +138,66 @@ class SosialSignInTest(TestCase):
         self.assertEqual(response.status_code, 401)
         self.assertEqual(response.json(), {'message': 'KEY_ERROR'})
 
+class SignInTest(TestCase):
+    def setUp(self):
+        client = Client()
+        User.objects.create(
+            name        = 'Corine',
+            email       = 'Corine@wecode.com',
+            password    = bcrypt.hashpw("test_password".encode('utf-8'), bcrypt.gensalt()).decode('utf-8'),
+            nickname    = 'nicknick'
+        )
+
+    def tearDown(self):
+        User.objects.get(email='Corine@wecode.com').delete()
+
+    def test_signin_view_sucess(self):
+        account = {
+            'email'     : 'Corine@wecode.com',
+            'password'  : "test_password",
+        }
+
+        accessed_user   = User.objects.get(email=account['email'])
+        access_token    = jwt.encode({'user_id': accessed_user.id}, SECRET_KEY, ALGORITHM).decode('utf-8')
+        response = self.client.post('/user/signin', json.dumps(account), content_type='application/json')
+
+        self.assertEqual(response.json(), {'Authorization': access_token})
+        self.assertEqual(response.status_code, 200)
+
+    def test_signin_view_wrong_password(self):
+        account = {
+            'email'     : 'Corine@wecode.com',
+            'password'  : 'wrong_password',
+        }
+
+        response = self.client.post('/user/signin', json.dumps(account), content_type='application/json')
+
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.json(), {'message':'INVALID_USER'})
+
+    def test_signin_view_wrong_email(self):
+        account = {
+            'email'     : 'wrong@wecode.com',
+            'password'  : 'test_password',
+        }
+
+        response = self.client.post('/user/signin', json.dumps(account), content_type='application/json')
+
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.json(), {'message':'INVALID_USER'})
+
+    def test_signin_view_email_key_error(self):
+        account = {'email':'Corine@wecode.com'}
+
+        response = self.client.post('/user/signin', json.dumps(account), content_type='application/json')
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json(), {'message':'KEY_ERROR'})
+
+    def test_signin_view_email_password_error(self):
+        account = {'password'  : 'test_password'}
+
+        response = self.client.post('/user/signin', json.dumps(account), content_type='application/json')
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json(), {'message':'KEY_ERROR'})
