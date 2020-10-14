@@ -13,7 +13,7 @@ def login_required(func):
 
         try:
             decoded_token = jwt.decode(token, SECRET_KEY, ALGORITHM)
-            request.user_id = decoded_token['user_id']
+            request.user  = User.objects.get(id=decoded_token['user_id'])
                     
         except jwt.exceptions.DecodeError:
             return JsonResponse({'message':'INVALID_TOKEN'}, status=403)

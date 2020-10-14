@@ -6,7 +6,8 @@ from django.test    import TestCase, Client
 from unittest.mock  import patch, MagicMock
 
 from wallstreet.settings    import SECRET_KEY, ALGORITHM
-from .models                import User
+from product.models         import Market, Product
+from .models                import User, WishList
 
 class SignUpTest(TestCase):
     def setUp(self):
@@ -26,7 +27,7 @@ class SignUpTest(TestCase):
             'password' : '123456789aA!'
         }
 
-        response = client.post('/account/signup',json.dumps(user), content_type='application/json')
+        response = client.post('/accounts/signup',json.dumps(user), content_type='application/json')
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.json(), {'message':'SUCCESS'})
     
@@ -37,7 +38,7 @@ class SignUpTest(TestCase):
                 'email'       : 'test@mail.com',
                 'passwordd'   : '123456789aA!',
                 }
-        response = client.post('/account/signup', json.dumps(user), content_type = 'application/json')
+        response = client.post('/accounts/signup', json.dumps(user), content_type = 'application/json')
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json(), {'message':'KEY_ERROR'})
 
@@ -48,7 +49,7 @@ class SignUpTest(TestCase):
                 'email'       : 'test@mail.com',
                 'password'    : '123456789aA!',
                 }
-        response = client.post('/account/signup', json.dumps(user), content_type = 'application/json')
+        response = client.post('/accounts/signup', json.dumps(user), content_type = 'application/json')
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json(), {'message':'DUPLICATED_REGISTER'})
     
@@ -59,7 +60,7 @@ class SignUpTest(TestCase):
                 'email'       : 'testmail.com',
                 'password'    : '12345678aaA!',
                 }
-        response = client.post('/account/signup', json.dumps(user), content_type = 'application/json')
+        response = client.post('/accounts/signup', json.dumps(user), content_type = 'application/json')
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json(), {'message':'INVALID_INFOS'})
 
@@ -84,7 +85,7 @@ class SosialSignInTest(TestCase):
                         }
 
         mocked_requests.get = MagicMock(return_value = MockedResponseTwo())
-        response = client.post("/user/socialsignin", **{"Authorization":"1234","content_type" : "application/json"})
+        response = client.post("/accounts/socialsignin", **{"Authorization":"1234","content_type" : "application/json"})
 
         accessed_user = User.objects.get(email='테스트이98765')
         access_token = jwt.encode({'user_id': accessed_user.id}, SECRET_KEY, ALGORITHM)
@@ -102,7 +103,7 @@ class SosialSignInTest(TestCase):
                         }
 
         mocked_requests.get = MagicMock(return_value = MockedResponseOne())
-        response = client.post("/user/socialsignin", **{"Authorization":"1234","content_type" : "application/json"})
+        response = client.post("/accounts/socialsignin", **{"Authorization":"1234","content_type" : "application/json"})
 
         accessed_user = User.objects.get(email='테스트일12345')
         access_token = jwt.encode({'user_id': accessed_user.id}, SECRET_KEY, ALGORITHM)
@@ -119,7 +120,7 @@ class SosialSignInTest(TestCase):
 
         mocked_requests.get = MagicMock(return_value = MockedResponseOne())
 
-        response = client.post("/user/socialsignin", **{"Authorization":"1234","content_type" : "application/json"})
+        response = client.post("/accounts/socialsignin", **{"Authorization":"1234","content_type" : "application/json"})
 
         self.assertEqual(response.status_code, 401)
         self.assertEqual(response.json(), {'message': 'KEY_ERROR'})
@@ -133,14 +134,30 @@ class SosialSignInTest(TestCase):
  
         mocked_requests.get = MagicMock(return_value = MockedResponseOne())
  
-        response = client.post("/user/socialsignin", **{"authooooo":"1234","content_type" : "application/json"})
+        response = client.post("/accounts/socialsignin", **{"authooooo":"1234","content_type" : "application/json"})
  
         self.assertEqual(response.status_code, 401)
         self.assertEqual(response.json(), {'message': 'KEY_ERROR'})
 
 class SignInTest(TestCase):
     def setUp(self):
-        client = Client()
+        Market.objects.create(name = 'Growth', transaction_fee_rate=0.02)
+        market_id= Market.objects.get(name='Growth').id
+
+        Product.objects.create(
+            abbreviation_name  = 'SUNS',
+            full_name          = '썬쓰',
+            image_url          = 'https://cdn.pixabay.com/photo/2016/11/05/20/08/sunflower-1801284_960_720.png',
+            market_id          = market_id,
+        )
+        Product.objects.create(
+            abbreviation_name  = 'TEST',
+            full_name          = 'Tests',
+            image_url          = 'https://cdn.pixabay.com/photo/2016/11/05/20/08/sunflower-1801284_960_720.png',
+            market_id          = market_id,
+        )
+        product_id = Product.objects.get(full_name='썬쓰').id
+
         User.objects.create(
             name        = 'Corine',
             email       = 'Corine@wecode.com',
@@ -149,6 +166,8 @@ class SignInTest(TestCase):
         )
 
     def tearDown(self):
+        Market.objects.all().delete()
+        Product.objects.all().delete()
         User.objects.get(email='Corine@wecode.com').delete()
 
     def test_signin_view_sucess(self):
@@ -159,7 +178,7 @@ class SignInTest(TestCase):
 
         accessed_user   = User.objects.get(email=account['email'])
         access_token    = jwt.encode({'user_id': accessed_user.id}, SECRET_KEY, ALGORITHM).decode('utf-8')
-        response = self.client.post('/user/signin', json.dumps(account), content_type='application/json')
+        response = self.client.post('/accounts/signin', json.dumps(account), content_type='application/json')
 
         self.assertEqual(response.json(), {'Authorization': access_token})
         self.assertEqual(response.status_code, 200)
@@ -170,7 +189,7 @@ class SignInTest(TestCase):
             'password'  : 'wrong_password',
         }
 
-        response = self.client.post('/user/signin', json.dumps(account), content_type='application/json')
+        response = self.client.post('/accounts/signin', json.dumps(account), content_type='application/json')
 
         self.assertEqual(response.status_code, 401)
         self.assertEqual(response.json(), {'message':'INVALID_USER'})
@@ -181,7 +200,7 @@ class SignInTest(TestCase):
             'password'  : 'test_password',
         }
 
-        response = self.client.post('/user/signin', json.dumps(account), content_type='application/json')
+        response = self.client.post('/accounts/signin', json.dumps(account), content_type='application/json')
 
         self.assertEqual(response.status_code, 401)
         self.assertEqual(response.json(), {'message':'INVALID_USER'})
@@ -189,7 +208,7 @@ class SignInTest(TestCase):
     def test_signin_view_email_key_error(self):
         account = {'email':'Corine@wecode.com'}
 
-        response = self.client.post('/user/signin', json.dumps(account), content_type='application/json')
+        response = self.client.post('/accounts/signin', json.dumps(account), content_type='application/json')
 
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json(), {'message':'KEY_ERROR'})
@@ -197,7 +216,126 @@ class SignInTest(TestCase):
     def test_signin_view_email_password_error(self):
         account = {'password'  : 'test_password'}
 
-        response = self.client.post('/user/signin', json.dumps(account), content_type='application/json')
+        response = self.client.post('/accounts/signin', json.dumps(account), content_type='application/json')
 
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json(), {'message':'KEY_ERROR'})
+
+class WishListTest(TestCase):
+    def setUp(self):
+        Market.objects.create(name = 'Growth', transaction_fee_rate=0.02)
+        market_id= Market.objects.get(name='Growth').id
+
+        Product.objects.create(
+            abbreviation_name  = 'SUNS',
+            full_name          = '썬쓰',
+            image_url          = 'https://cdn.pixabay.com/photo/2016/11/05/20/08/sunflower-1801284_960_720.png',
+            market_id          = market_id,
+        )
+        Product.objects.create(
+            abbreviation_name  = 'TEST',
+            full_name          = 'Tests',
+            image_url          = 'https://cdn.pixabay.com/photo/2016/11/05/20/08/sunflower-1801284_960_720.png',
+            market_id          = market_id,
+        )
+        product_id = Product.objects.get(full_name='썬쓰').id
+
+        User.objects.create(
+            name        = 'Corine',
+            email       = 'Corine@wecode.com',
+            password    = bcrypt.hashpw("test_password".encode('utf-8'), bcrypt.gensalt()).decode('utf-8'),
+            nickname    = 'nicknick'
+        )
+        user_id = User.objects.get(email='Corine@wecode.com').id
+
+        WishList.objects.create(user_id=user_id, product_id=product_id)
+
+    def tearDown(self):
+        User.objects.all().delete()
+        Market.objects.all().delete()
+        Product.objects.all().delete()
+        WishList.objects.all().delete()
+
+    def test_delete_wishlist_sucess(self):
+        client = Client()
+        test = {'product_id':Product.objects.get(full_name='썬쓰').id}
+
+        corine_id       = User.objects.get(email='Corine@wecode.com').id
+        access_token    = jwt.encode({'user_id': corine_id}, SECRET_KEY, ALGORITHM).decode('utf-8')
+        response        = self.client.post(
+                            '/accounts/wishlists', 
+                            json.dumps(test), 
+                            content_type='application/json',
+                            **{'HTTP_Authorization':access_token,
+                            } 
+                        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {'message':"SUCCESS"})
+
+    def test_add_wishlist_sucess(self):
+        client = Client()
+        test = {'product_id':Product.objects.get(full_name='Tests').id}
+
+        corine_id       = User.objects.get(email='Corine@wecode.com').id
+        access_token    = jwt.encode({'user_id': corine_id}, SECRET_KEY, ALGORITHM).decode('utf-8')
+        response        = self.client.post(
+                            '/accounts/wishlists', 
+                            json.dumps(test), 
+                            content_type='application/json',
+                            **{'HTTP_Authorization':access_token,
+                            } 
+                        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {'message':"SUCCESS"})
+
+    def test_add_delete_wishlist_body_key_error(self):
+        client = Client()
+        test = {'product':Product.objects.get(full_name='Tests').id}
+
+        corine_id       = User.objects.get(email='Corine@wecode.com').id
+        access_token    = jwt.encode({'user_id': corine_id}, SECRET_KEY, ALGORITHM).decode('utf-8')
+        response        = self.client.post(
+                            '/accounts/wishlists', 
+                            json.dumps(test), 
+                            content_type='application/json',
+                            **{'HTTP_Authorization':access_token,
+                            } 
+                        )
+
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.json(), {'message':"KEY_ERROR"})
+
+    def test_add_delete_wishlist_headers_key_error(self):
+        client = Client()
+        test = {'product_id':Product.objects.get(full_name='Tests').id}
+
+        corine_id       = User.objects.get(email='Corine@wecode.com').id
+        access_token    = jwt.encode({'user_id': corine_id}, SECRET_KEY, ALGORITHM).decode('utf-8')
+        response        = self.client.post(
+                            '/accounts/wishlists', 
+                            json.dumps(test), 
+                            content_type='application/json',
+                            **{'HTTP_Authooooooo':access_token,
+                            } 
+                        )
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json(), {'message':"NO_TOKEN"})
+    
+    def test_add_delete_wishlist_headers_wrong_token(self):
+        client = Client()
+        test = {'product_id':Product.objects.get(full_name='Tests').id}
+
+        corine_id       = User.objects.get(email='Corine@wecode.com').id
+        access_token    = jwt.encode({'user_id': corine_id}, SECRET_KEY, ALGORITHM).decode('utf-8')
+        response        = self.client.post(
+                            '/accounts/wishlists', 
+                            json.dumps(test), 
+                            content_type='application/json',
+                            **{'HTTP_Authorization':access_token+'wrong_token_kekekekekek',
+                            } 
+                        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json(), {'message':'INVALID_TOKEN'})
