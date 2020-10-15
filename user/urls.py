@@ -7,4 +7,5 @@ urlpatterns = [
         path('/socialsignin', SocialSignInView.as_view()),
         path('/signin', SignInView.as_view()),
         path('/wishlists', WishListView.as_view()),
+        path('/assets', AssetListView.as_view())
         ]
