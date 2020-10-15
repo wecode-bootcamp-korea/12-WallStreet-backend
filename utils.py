@@ -21,3 +21,14 @@ def login_required(func):
         return func(self, request, *args, **kwargs) 
         
     return wrapper
+
+def is_wishlist(request, product_id, *args, **kwargs):
+    try:
+        token = request.headers.get('Authorization')
+        decoded_token = jwt.decode(token, SECRET_KEY, ALGORITHM)
+        user_id = decoded_token['user_id']
+        if WishList.objects.filter(user_id=user_id, product_id=product_id).exists():
+            return True
+        return False
+    except:
+        return False
