@@ -11,14 +11,17 @@ from django.contrib.sites.shortcuts  import get_current_site
 from django.utils.http               import urlsafe_base64_encode, urlsafe_base64_decode
 from django.core.mail                import EmailMessage
 from django.utils.encoding           import force_bytes, force_text
+from django.db.models                import Avg
 
-from .models                import User, WishList
+from .models                import User, WishList, Asset
+from order.models           import Order
 from my_settings            import EMAIL
 from wallstreet.settings    import SECRET_KEY, ALGORITHM
 from .utils                 import validate_email, validate_password
 from .activation_token      import account_activation_token
 from .text                  import email_text
 from utils                  import login_required
+
 
 class SignUpView(View):
     def post(self, request):
@@ -138,3 +141,50 @@ class WishListView(View):
 
         except:
             return JsonResponse({'message':'KEY_ERROR'}, status=401)
+
+class AssetListView(View):
+    @login_required
+    def get(self, request):
+        user = request.user
+        try:
+            existing_buy_orders = Order.objects.filter(
+                user_id=user.id, 
+                buy_or_sell=False, 
+                status=True)
+          
+            pending_order_amount = sum([order.remaining_quantity*order.price for order in existing_buy_orders])
+            user_asset           = Asset.objects.filter(user=user).select_related('user','product').prefetch_related('product__transaction_set')
+            user_balance         = user.bank_account.balance
+            available_balance    = user_balance - pending_order_amount
+            coin_list            = [
+                {
+                "product_id"           : coin.product.id,
+                "icon"                 : coin.product.image_url,
+                "coin_name"            : coin.product.full_name,
+                "coin_code"            : coin.product.abbreviation_name,
+                "quantity"             : round(float(coin.product_quantity)),
+                "available_coin"       : round(float(coin.product_quantity - sum([available_quantity.remaining_quantity \
+                                                                    for available_quantity in coin.user.order_set\
+                                                                    .filter(product_id=coin.product.id, buy_or_sell=True, status=True)]))),
+                "average_buying_price" : coin.product.transaction_set.filter(buying_order__user_id=coin.user.id).aggregate(Avg('price')),
+                "buying_price"         : round(float(coin.user.order_set.filter(buy_or_sell=False, product_id=coin.product.id).last().price)),                   
+                "current_price"        : round(float(coin.product.transaction_set.last().price)),
+                "profit_rate"          : round(float(((coin.product.transaction_set.last().price)/
+                                        (coin.user.order_set.filter(buy_or_sell=False, product_id=coin.product.id).last().price)) * 100)-100
+                                        )} for coin in user_asset if len(coin.product.transaction_set.filter(buying_order__user_id=coin.user.id)) > 0]
+            
+            coin_balance       = sum([coin['current_price'] * coin['quantity'] for coin in coin_list])
+            total_buying_price = sum([coin['buying_price'] * coin['quantity'] for coin in coin_list])
+            profit             = coin_balance - total_buying_price
+            profit_rate        = ((coin_balance / total_buying_price) * 100) - 100
+        
+            return JsonResponse({'coin_list'       : coin_list, 
+                                'total_asset'      : round(float(user_balance + coin_balance)),
+                                'won_balance'      : round(float(user_balance)), 
+                                'available_balance': round(float(available_balance)),
+                                'coin_balance'     : round(float(coin_balance)),
+                                'total_buy_price'  : round(float(total_buying_price)), 
+                                'profit'           : round(float(profit)), 
+                                'profit_rate'      : round(float(profit_rate),2)}, status=200)
+        except User.DoesNotExist:
+            return JsonResponse({'message':'DOES_NOT_EXIST'}, status=400)
